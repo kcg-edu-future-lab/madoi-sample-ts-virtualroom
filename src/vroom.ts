@@ -1,6 +1,6 @@
 import { Container, Circle, G, Text, SVG } from '@svgdotjs/svg.js'
 import '@svgdotjs/svg.draggable.js'
-import { EnterRoom, GetState, PeerJoin, PeerLeave, SetState, Share } from './madoi/madoi';
+import { ChangeState, Distributed, EnterRoomAllowed, EnterRoomAllowedDetail, GetState, PeerEntered, PeerEnteredDetail, PeerLeaved, PeerLeavedDetail, SetState } from 'madoi-client';
 
 export class Room {
     private container: Container;
@@ -12,19 +12,27 @@ export class Room {
         this.container.size(width, height);
     }
 
-    @EnterRoom()
-    enterRoom(selfPeerId: string, peers: {id: string, order: number}[]){
-        this.peerJoin(selfPeerId);
-        peers.forEach(p=>this.peerJoin(p.id));
+    @EnterRoomAllowed()
+    enterRoomAllowed({selfPeer, otherPeers}: EnterRoomAllowedDetail){
+        this.addPeer(selfPeer.id);
+        otherPeers.forEach(p=>this.addPeer(p.id));
     }
 
-    @PeerJoin()
-    peerJoin(peerId: string){
+    @PeerEntered()
+    peerEnter({peer}: PeerEnteredDetail){
+        this.addPeer(peer.id);
+    }
+
+    @PeerLeaved()
+    peerLeave({peerId}: PeerLeavedDetail){
+        this.removePeer(peerId);
+    }
+
+    private addPeer(peerId: string){
         this.validAvatorIds.add(peerId);
     }
 
-    @PeerLeave()
-    peerLeave(peerId: string){
+    private removePeer(peerId: string){
         this.validAvatorIds.delete(peerId);
         const a = this.avators.get(peerId);
         if(a){
@@ -33,7 +41,8 @@ export class Room {
         }
     }
 
-    @Share({ type: "afterExec", maxLog: 1000 })
+    @Distributed({ serialized: false })
+    @ChangeState()
     newAvator(id: string, name: string, x: number, y: number) {
         if(!this.validAvatorIds.has(id)) return;
         const avator = new Avator(this.container, name);
@@ -42,13 +51,15 @@ export class Room {
         return avator;
     }
 
-    @Share({ type: "afterExec", maxLog: 1000 })
+    @Distributed({ serialized: false })
+    @ChangeState()
     changeName(id: string, name: string) {
         const a = this.avators.get(id);
         a?.setName(name);
     }
 
-    @Share({ type: "afterExec", maxLog: 1000 })
+    @Distributed({ serialized: false })
+    @ChangeState()
     setPosition(id: string, x: number, y: number) {
         const avator = this.avators.get(id);
         if (avator) {
@@ -56,7 +67,7 @@ export class Room {
         }
     }
 
-    @GetState({ maxInterval: 5000, maxUpdates: 1000})
+    @GetState()
     getState(): string {
         const ret = [];
         for (const [id, a] of this.avators) {
